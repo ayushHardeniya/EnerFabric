@@ -39,8 +39,11 @@ infra/      Local development infrastructure config (Mosquitto)
 docker compose up -d
 ```
 
-This starts PostgreSQL (`localhost:5432`) and Mosquitto (`localhost:1883`)
-for local development.
+This starts PostgreSQL (`localhost:5433`) and Mosquitto (`localhost:1883`)
+for local development. PostgreSQL uses host port 5433 rather than the
+default 5432 to avoid colliding with unrelated PostgreSQL instances some
+WSL2/Docker Desktop setups already have bound to 127.0.0.1:5432; the
+container's internal port is still the standard 5432.
 
 ### 2. Backend
 

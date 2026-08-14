@@ -14,8 +14,15 @@ services:
       POSTGRES_USER: enerfabric
       POSTGRES_PASSWORD: enerfabric
       POSTGRES_DB: enerfabric
+    # Host-side port is 5433, not the default 5432: on at least one team
+    # member's WSL2 setup, 127.0.0.1:5432 is already occupied by an
+    # unrelated PostgreSQL instance outside Docker (reached via WSL2's
+    # automatic loopback forwarding), which silently intercepts connections
+    # with different credentials. The container's own internal port stays
+    # 5432 — only the host mapping changed. See CLAUDE.md Milestone 4 for
+    # the diagnosis.
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

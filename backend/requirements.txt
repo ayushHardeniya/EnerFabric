@@ -5,9 +5,9 @@ fastapi>=0.115,<1.0
 uvicorn[standard]>=0.32,<1.0
 pydantic>=2.9,<3.0
 pydantic-settings>=2.6,<3.0
+sqlalchemy>=2.0,<3.0
+psycopg[binary]>=3.2,<4.0
+alembic>=1.14,<2.0
 
 # Introduced in later milestones (kept here so the requirement set is visible early):
-# sqlalchemy>=2.0        # Milestone 4 - PostgreSQL persistence
-# asyncpg>=0.30           # Milestone 4 - async Postgres driver
-# alembic>=1.14            # Milestone 4 - schema migrations
 # paho-mqtt>=2.1           # Milestone 5 - MQTT integration
