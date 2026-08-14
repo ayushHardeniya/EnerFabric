@@ -6,11 +6,12 @@
 # same file can bring up the whole MVP on a fresh host with
 # `docker compose up -d --build`).
 #
-# postgres/mosquitto are bound to 127.0.0.1 only — reachable from the
-# host machine (for local dev tooling / a host-run backend) but never
-# from outside the machine, since nothing external needs to reach them
-# directly. backend/frontend are bound to all interfaces since the demo
-# needs to reach them from outside the VM.
+# postgres/mosquitto/backend/frontend are all bound to 127.0.0.1 only —
+# reachable from the host machine (local dev tooling, a host-run
+# backend, debugging on the VM) but never from outside the machine.
+# nginx is the single public entry point (port 80), reverse-proxying
+# to frontend/backend over the internal Docker network — see
+# infra/nginx/nginx.conf.
 #
 # All credentials/ports/URLs are environment-overridable (see
 # .env.example) — nothing here is a real secret or a public IP.
@@ -75,23 +76,23 @@ services:
       MQTT_BROKER_PORT: "1883"
       MQTT_ENABLED: "true"
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
 
   frontend:
     build:
       context: ./frontend
       args:
         # Baked into the client bundle at build time (Next.js inlines
-        # NEXT_PUBLIC_* at build, not at container runtime) — must be
-        # the URL the *browser* will use to reach the backend, e.g.
-        # http://<vm-public-ip>:${BACKEND_PORT:-8000}. Set this in your
-        # own .env file before building; see .env.example.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        # NEXT_PUBLIC_* at build, not at container runtime). Left empty
+        # by default: the frontend then calls /api/... same-origin,
+        # which nginx routes to the backend — no public IP/hostname
+        # needed. Only set this if bypassing nginx entirely.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL-}
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
 
   # Standalone DER telemetry publisher — behaves like external device
   # infrastructure, publishing over MQTT into the same backend/DB the
@@ -110,6 +111,20 @@ services:
       MQTT_BROKER_HOST: mosquitto
       MQTT_BROKER_PORT: "1883"
     command: python -m app.mqtt.run_simulator
+
+  # Single public entry point — reverse-proxies / to the frontend and
+  # /api/ (including the /api/v1/ws WebSocket) to the backend, so only
+  # port 80 needs to be reachable from outside the host.
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
 volumes:
   postgres_data:
