@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     # postgres service comment / CLAUDE.md Milestone 4 for why.
     database_url: str = "postgresql+psycopg://enerfabric:enerfabric@localhost:5433/enerfabric"
 
+    # MQTT broker (Mosquitto, see docker-compose.yml). ``mqtt_enabled``
+    # lets the backend start (and its tests run) even when no broker is
+    # reachable — a connection failure at startup is logged and the app
+    # keeps serving the REST API without live telemetry ingestion, rather
+    # than crashing.
+    mqtt_broker_host: str = "localhost"
+    mqtt_broker_port: int = 1883
+    mqtt_enabled: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

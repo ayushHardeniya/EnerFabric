@@ -74,6 +74,45 @@ npm run dev
 
 The app is served at `http://localhost:3000`.
 
+## Running the DER simulator over MQTT
+
+The backend subscribes to Mosquitto on startup and persists any telemetry
+it receives on `enerfabric/telemetry/{asset_id}` through the same
+repository/database layer the REST API uses. The DER simulator publishes
+simulated device telemetry to that broker, standing in for real device
+infrastructure. With infra up (step 1) and the backend running (step 2),
+in two more terminals from `backend/` (with the venv activated):
+
+```bash
+# One-time per fresh database: registers the simulator's fleet
+# (solar-1, battery-1, ev-1, flex-1, crit-1, grid-1) as assets, since
+# telemetry for an asset that doesn't exist yet is discarded.
+python -m app.mqtt.seed_assets
+
+# Publishes simulated telemetry for that fleet every 5 real seconds
+# (each publish advances the simulation by 15 simulated minutes).
+python -m app.mqtt.run_simulator
+```
+
+Or, from the repository root, the equivalent Makefile targets:
+
+```bash
+make infra-up
+make run-backend      # separate terminal
+make seed-assets      # once, after the backend is up
+make run-simulator    # separate terminal
+```
+
+Verify telemetry is flowing end-to-end via the existing REST API:
+
+```bash
+curl http://localhost:8000/api/v1/telemetry
+```
+
+Set `MQTT_ENABLED=false` in `backend/.env` to run the backend without a
+broker (e.g. no Docker available) — the REST API still works, just
+without live MQTT telemetry ingestion.
+
 ## Project status
 
 Milestone 0 (repository bootstrap) is complete and has passed a strict

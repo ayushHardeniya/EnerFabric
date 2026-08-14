@@ -8,6 +8,4 @@ pydantic-settings>=2.6,<3.0
 sqlalchemy>=2.0,<3.0
 psycopg[binary]>=3.2,<4.0
 alembic>=1.14,<2.0
-
-# Introduced in later milestones (kept here so the requirement set is visible early):
-# paho-mqtt>=2.1           # Milestone 5 - MQTT integration
+paho-mqtt>=2.1,<3.0
