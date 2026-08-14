@@ -30,12 +30,12 @@ next-env.d.ts.bak
 .idea/
 *.swp
 
-# --- Claude Code (local, machine-specific) ---
+# --- Local AI assistant working files (machine-specific, private) ---
 .claude/settings.local.json
 
 # --- Logs ---
 *.log
 
-# Local Claude Code state
+# Local AI assistant working state / private project notes
 .claude/
 CLAUDE.md

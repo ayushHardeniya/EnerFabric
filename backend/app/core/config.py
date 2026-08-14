@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
     # Host port 5433, not the default 5432 — see docker-compose.yml's
-    # postgres service comment / CLAUDE.md Milestone 4 for why.
+    # postgres service comment for why.
     database_url: str = "postgresql+psycopg://enerfabric:enerfabric@localhost:5433/enerfabric"
 
     # MQTT broker (Mosquitto, see docker-compose.yml). ``mqtt_enabled``

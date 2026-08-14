@@ -3,7 +3,7 @@ independent function from a ``CoordinationContext`` (current assets,
 active intents, system policies) to a feasible, explainable
 ``CoordinationRun``.
 
-Design, following the locked principles in CLAUDE.md §5/§18:
+Design, following the project's locked coordination principles:
 
 1. Hard constraints (availability, capability limits, battery reserve,
    critical-load protection) are applied before any priority-based
