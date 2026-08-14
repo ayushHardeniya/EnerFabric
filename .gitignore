@@ -1,0 +1,39 @@
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node / frontend ---
+node_modules/
+.next/
+out/
+next-env.d.ts.bak
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+!*/.env.example
+
+# --- Docker / data ---
+*.pgdata/
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# --- Claude Code (local, machine-specific) ---
+.claude/settings.local.json
+
+# --- Logs ---
+*.log
+
+CLAUDE.md

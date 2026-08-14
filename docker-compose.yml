@@ -1,0 +1,36 @@
+# Local development infrastructure dependencies for EnerFabric.
+#
+# Scope at Milestone 0: PostgreSQL and Mosquitto only, so the backend can
+# be pointed at a real database and broker from Milestone 4 / 5 onward
+# without needing local installs. The backend and frontend application
+# services are added to this file at Milestone 9 (Docker Compose), once
+# they have real functionality worth containerizing together.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: enerfabric
+      POSTGRES_PASSWORD: enerfabric
+      POSTGRES_DB: enerfabric
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enerfabric"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+volumes:
+  postgres_data:
