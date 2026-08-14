@@ -7,7 +7,14 @@
  */
 
 import { API_BASE_URL, API_V1_PREFIX } from "./config";
-import type { Asset, HealthResponse, IntentSummary, Policy } from "@/types/domain";
+import type {
+  Asset,
+  CoordinationRun,
+  HealthResponse,
+  Intent,
+  Policy,
+  TriggerReason,
+} from "@/types/domain";
 
 const RESOURCE_BASE = `${API_BASE_URL}${API_V1_PREFIX}`;
 
@@ -21,10 +28,10 @@ export class ApiError extends Error {
   }
 }
 
-async function get<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, init);
   } catch {
     // fetch() rejects (rather than resolving with a non-ok status) for
     // network-level failures — no server listening at this URL, DNS
@@ -41,8 +48,16 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const api = {
-  health: () => get<HealthResponse>(`${API_BASE_URL}/health`),
-  listAssets: () => get<Asset[]>(`${RESOURCE_BASE}/assets`),
-  listIntents: () => get<IntentSummary[]>(`${RESOURCE_BASE}/intents`),
-  listPolicies: () => get<Policy[]>(`${RESOURCE_BASE}/policies`),
+  health: () => fetchJson<HealthResponse>(`${API_BASE_URL}/health`),
+  listAssets: () => fetchJson<Asset[]>(`${RESOURCE_BASE}/assets`),
+  listIntents: () => fetchJson<Intent[]>(`${RESOURCE_BASE}/intents`),
+  listPolicies: () => fetchJson<Policy[]>(`${RESOURCE_BASE}/policies`),
+  getCoordinationRun: (id: string) =>
+    fetchJson<CoordinationRun>(`${RESOURCE_BASE}/coordination/runs/${id}`),
+  triggerCoordinationRun: (triggerReason: TriggerReason) =>
+    fetchJson<CoordinationRun>(`${RESOURCE_BASE}/coordination/runs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trigger_reason: triggerReason }),
+    }),
 };

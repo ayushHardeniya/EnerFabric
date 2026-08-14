@@ -1,8 +1,14 @@
-import { formatAssetType, formatPercent, formatPowerKw, formatTimestamp } from "@/lib/format";
+import {
+  humanizeSnakeCase,
+  formatCapability,
+  formatPercent,
+  formatPowerKw,
+  formatTimestamp,
+} from "@/lib/format";
 import type { Asset } from "@/types/domain";
 import { StatusPill } from "./StatusPill";
 
-export function AssetTable({ assets }: { assets: Asset[] }) {
+export function AssetTable({ assets, detailed = false }: { assets: Asset[]; detailed?: boolean }) {
   if (assets.length === 0) {
     return (
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -20,6 +26,7 @@ export function AssetTable({ assets }: { assets: Asset[] }) {
           <tr>
             <th className="px-4 py-2 font-medium">Asset</th>
             <th className="px-4 py-2 font-medium">Type</th>
+            {detailed && <th className="px-4 py-2 font-medium">Capabilities</th>}
             <th className="px-4 py-2 font-medium">State</th>
             <th className="px-4 py-2 font-medium">Power</th>
             <th className="px-4 py-2 font-medium">SOC</th>
@@ -33,8 +40,26 @@ export function AssetTable({ assets }: { assets: Asset[] }) {
               <tr key={asset.id} className="border-b border-black/5 last:border-0 dark:border-white/5">
                 <td className="px-4 py-2 font-medium">{asset.name}</td>
                 <td className="px-4 py-2 capitalize text-zinc-600 dark:text-zinc-300">
-                  {formatAssetType(asset.type)}
+                  {humanizeSnakeCase(asset.type)}
                 </td>
+                {detailed && (
+                  <td className="px-4 py-2 text-zinc-600 dark:text-zinc-300">
+                    {asset.capabilities.length === 0 ? (
+                      "—"
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {asset.capabilities.map((capability) => (
+                          <span
+                            key={capability.type}
+                            className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs dark:bg-zinc-800"
+                          >
+                            {formatCapability(capability)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                )}
                 <td className="px-4 py-2">
                   {telemetry ? (
                     <StatusPill
