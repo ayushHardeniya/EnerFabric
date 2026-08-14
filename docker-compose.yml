@@ -1,31 +1,34 @@
-# Local development infrastructure dependencies for EnerFabric.
+# EnerFabric — full stack.
 #
-# Scope at Milestone 0: PostgreSQL and Mosquitto only, so the backend can
-# be pointed at a real database and broker from Milestone 4 / 5 onward
-# without needing local installs. The backend and frontend application
-# services are added to this file at Milestone 9 (Docker Compose), once
-# they have real functionality worth containerizing together.
+# Covers both local development infra (postgres + mosquitto, unchanged
+# since Milestone 0 — see `make infra-up` / README.md) and a complete
+# deployment (backend + frontend + DER simulator added on top, so the
+# same file can bring up the whole MVP on a fresh host with
+# `docker compose up -d --build`).
+#
+# postgres/mosquitto are bound to 127.0.0.1 only — reachable from the
+# host machine (for local dev tooling / a host-run backend) but never
+# from outside the machine, since nothing external needs to reach them
+# directly. backend/frontend are bound to all interfaces since the demo
+# needs to reach them from outside the VM.
+#
+# All credentials/ports/URLs are environment-overridable (see
+# .env.example) — nothing here is a real secret or a public IP.
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: enerfabric
-      POSTGRES_PASSWORD: enerfabric
-      POSTGRES_DB: enerfabric
-    # Host-side port is 5433, not the default 5432: on at least one team
-    # member's WSL2 setup, 127.0.0.1:5432 is already occupied by an
-    # unrelated PostgreSQL instance outside Docker (reached via WSL2's
-    # automatic loopback forwarding), which silently intercepts connections
-    # with different credentials. The container's own internal port stays
-    # 5432 — only the host mapping changed.
+      POSTGRES_USER: ${POSTGRES_USER:-enerfabric}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-enerfabric}
+      POSTGRES_DB: ${POSTGRES_DB:-enerfabric}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U enerfabric"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-enerfabric}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -34,9 +37,79 @@ services:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
-      - "1883:1883"
+      - "127.0.0.1:${MOSQUITTO_PORT:-1883}:1883"
     volumes:
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  # One-shot: applies Alembic migrations, then registers the simulator's
+  # default fleet as assets (idempotent — see app/mqtt/seed_assets.py).
+  # Runs once per `docker compose up` and exits; the backend waits for it
+  # to complete successfully before starting.
+  migrate:
+    build:
+      context: ./backend
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-enerfabric}:${POSTGRES_PASSWORD:-enerfabric}@postgres:5432/${POSTGRES_DB:-enerfabric}
+      MQTT_ENABLED: "false"
+    command: sh -c "alembic upgrade head && python -m app.mqtt.seed_assets"
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-enerfabric}:${POSTGRES_PASSWORD:-enerfabric}@postgres:5432/${POSTGRES_DB:-enerfabric}
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: "1883"
+      MQTT_ENABLED: "true"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle at build time (Next.js inlines
+        # NEXT_PUBLIC_* at build, not at container runtime) — must be
+        # the URL the *browser* will use to reach the backend, e.g.
+        # http://<vm-public-ip>:${BACKEND_PORT:-8000}. Set this in your
+        # own .env file before building; see .env.example.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+  # Standalone DER telemetry publisher — behaves like external device
+  # infrastructure, publishing over MQTT into the same backend/DB the
+  # REST API and frontend use (see app/mqtt/run_simulator.py). Reuses
+  # the backend image; never talks to the backend directly.
+  simulator:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: "1883"
+    command: python -m app.mqtt.run_simulator
 
 volumes:
   postgres_data:

@@ -34,7 +34,7 @@ infra/      Local development infrastructure config (Mosquitto)
 ### 1. Start local infrastructure
 
 ```bash
-docker compose up -d
+docker compose up -d postgres mosquitto   # or: make infra-up
 ```
 
 This starts PostgreSQL (`localhost:5433`) and Mosquitto (`localhost:1883`)
@@ -42,6 +42,12 @@ for local development. PostgreSQL uses host port 5433 rather than the
 default 5432 to avoid colliding with unrelated PostgreSQL instances some
 WSL2/Docker Desktop setups already have bound to 127.0.0.1:5432; the
 container's internal port is still the standard 5432.
+
+`docker-compose.yml` also defines `backend`/`frontend`/`simulator`
+services for a full containerized deployment (see
+[Deployment](#deployment-docker-compose-on-a-fresh-vm) below) — naming
+`postgres mosquitto` explicitly here keeps local dev running the
+backend/frontend as regular host processes, as in steps 2–3.
 
 ### 2. Backend
 
@@ -154,6 +160,85 @@ manual check with `websocat` (or any WebSocket client):
 websocat ws://localhost:8000/api/v1/ws
 # in another terminal: curl -X POST http://localhost:8000/api/v1/coordination/runs \
 #   -H 'Content-Type: application/json' -d '{"trigger_reason":"manual"}'
+```
+
+## Deployment (Docker Compose on a fresh VM)
+
+Runs the complete stack — PostgreSQL, Mosquitto, backend, frontend, and
+the DER simulator — as containers on a single host (e.g. an Ubuntu VM),
+using the same `docker-compose.yml` as local dev plus the services it
+adds for this purpose. No new database/migration mechanism is
+introduced: this runs the project's existing Alembic migrations.
+
+### Prerequisites
+
+- Docker Engine + Docker Compose v2 (`docker compose version`)
+- Git
+- Ports `8000` (backend) and `3000` (frontend) reachable from wherever
+  you'll access the demo; PostgreSQL/Mosquitto are bound to
+  `127.0.0.1` only and are never exposed externally.
+
+### 1. Configure environment
+
+```bash
+git clone <repo-url>
+cd enerfabric
+cp .env.example .env
+```
+
+Edit `.env`:
+
+- `NEXT_PUBLIC_API_URL` — set to `http://<vm-public-ip>:8000` (or a
+  domain, if you have one). This is the URL a **browser** will use to
+  reach the backend, and is baked into the frontend at build time — get
+  it right before building, since changing it later requires rebuilding
+  the frontend image.
+- `POSTGRES_PASSWORD` — change from the placeholder for anything beyond
+  a throwaway demo.
+- `BACKEND_PORT` / `FRONTEND_PORT` — only change if `8000`/`3000` are
+  already in use.
+
+See `.env.example` for the full list and defaults.
+
+### 2. Bring up the stack
+
+```bash
+docker compose up -d --build   # or: make deploy-up
+```
+
+This builds the backend and frontend images, starts PostgreSQL and
+Mosquitto, runs the existing Alembic migrations and asset-seeding step
+once (the `migrate` service — `alembic upgrade head` then
+`app.mqtt.seed_assets`, both already-existing, unmodified scripts), then
+starts the backend, frontend, and simulator. `docker compose ps` should
+show all six services; `migrate` shows `Exited (0)` once it has finished
+(this is expected — it's a one-shot init step, not a long-running
+service).
+
+### 3. Verify
+
+```bash
+curl http://localhost:8000/health                 # backend up
+curl http://localhost:8000/api/v1/assets           # seeded fleet present
+curl http://localhost:8000/api/v1/telemetry        # simulator telemetry flowing (wait ~10s after startup)
+```
+
+Open `http://<vm-public-ip>:3000` in a browser — the Overview page
+should show backend/realtime status as connected, the seeded asset
+fleet, and telemetry updating live as the simulator publishes.
+
+### Updating
+
+```bash
+git pull
+docker compose up -d --build   # rebuilds changed images, reapplies migrations, restarts
+```
+
+### Stopping
+
+```bash
+docker compose down            # or: make deploy-down
+docker compose down -v         # also removes the postgres_data volume (destroys the database)
 ```
 
 ## Project status
