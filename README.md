@@ -113,6 +113,45 @@ Set `MQTT_ENABLED=false` in `backend/.env` to run the backend without a
 broker (e.g. no Docker available) — the REST API still works, just
 without live MQTT telemetry ingestion.
 
+## Realtime updates over WebSocket
+
+With the backend running (step 2), connect to:
+
+```
+ws://localhost:8000/api/v1/ws
+```
+
+Every connected client receives a small JSON envelope whenever something
+happens:
+
+```json
+{
+  "type": "telemetry.updated",
+  "timestamp": "2026-08-14T02:13:36.270237+00:00",
+  "data": { "asset_id": "solar-1", "power_kw": 3.5, "...": "..." }
+}
+```
+
+Two event types are broadcast today:
+
+- `telemetry.updated` — a telemetry reading received over MQTT was
+  persisted (see "Running the DER simulator over MQTT" above). `data` is
+  the full `Telemetry` domain object.
+- `coordination.completed` — a coordination run finished (triggered via
+  `POST /api/v1/coordination/runs`). `data` is the full `CoordinationRun`
+  domain object, including its allocations.
+
+The server doesn't expect or act on anything a client sends; it's a
+one-way, best-effort delivery channel with no persistence of its own — a
+client that connects after an event fired simply doesn't see it. Quick
+manual check with `websocat` (or any WebSocket client):
+
+```bash
+websocat ws://localhost:8000/api/v1/ws
+# in another terminal: curl -X POST http://localhost:8000/api/v1/coordination/runs \
+#   -H 'Content-Type: application/json' -d '{"trigger_reason":"manual"}'
+```
+
 ## Project status
 
 Milestone 0 (repository bootstrap) is complete and has passed a strict

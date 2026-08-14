@@ -5,6 +5,14 @@ Handlers stay thin — they assemble the engine's input from persisted
 state via the repository, call the existing deterministic
 ``run_coordination`` engine unchanged, and persist the result. No
 coordination/decision logic lives here.
+
+After a run is persisted, its result is also broadcast to connected
+WebSocket clients (Milestone 6) via ``broadcast_threadsafe`` — this
+handler is a plain ``def``, so FastAPI runs it in a worker thread, not
+the asyncio event loop, which is exactly the case
+``broadcast_threadsafe`` is for. Broadcasting is a realtime notification
+of the decision already made and saved above; it is not part of the
+coordination decision itself.
 """
 
 from fastapi import APIRouter, HTTPException, status
@@ -14,6 +22,7 @@ from app.api.schemas import CoordinationRunCreate
 from app.coordination import run_coordination
 from app.db import repository as repo
 from app.domain import CoordinationRun
+from app.realtime import coordination_completed_event, manager
 
 router = APIRouter(prefix="/coordination", tags=["coordination"])
 
@@ -22,7 +31,9 @@ router = APIRouter(prefix="/coordination", tags=["coordination"])
 def create_coordination_run(payload: CoordinationRunCreate, db: DbSession) -> CoordinationRun:
     context = repo.build_coordination_context(db, trigger_reason=payload.trigger_reason)
     run = run_coordination(context)
-    return repo.save_coordination_run(db, run)
+    saved = repo.save_coordination_run(db, run)
+    manager.broadcast_threadsafe(coordination_completed_event(saved))
+    return saved
 
 
 @router.get("/runs/{run_id}", response_model=CoordinationRun)
