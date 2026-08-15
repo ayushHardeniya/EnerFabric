@@ -2,264 +2,131 @@
 
 **Intent-Driven Energy Orchestration Platform for Distributed Energy Resources.**
 
+[![MQTT](https://img.shields.io/badge/telemetry-MQTT-660066?logo=eclipsemosquitto&logoColor=white)](infra/mosquitto/mosquitto.conf)
+[![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Azure](https://img.shields.io/badge/hosted%20on-Azure-0078D4?logo=microsoftazure&logoColor=white)](docs/deployment.md)
+
+[![Live Demo](https://img.shields.io/badge/Live-Demo-22C55E)](http://20.120.168.206/)
+[![Docs](https://img.shields.io/badge/docs-guide-blue)](docs/getting-started.md)
+
 Built by team **ZenYukti** for **SRCAS Hackathon 3.0**.
 
-EnerFabric coordinates existing distributed energy resources — rooftop
-solar, EV chargers, battery storage, flexible loads, critical loads —
-across a site by combining their live telemetry with what each asset
-*needs or prefers* (its **intent**), plus system policies and grid
-state, to produce a feasible, explainable, multi-asset allocation plan.
-It is not a monitoring dashboard: it makes and explains operational
-decisions.
+## What is EnerFabric?
 
-See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for a high-level overview
-of the system's components and how data flows through them.
+Rooftop solar, batteries, EV chargers, and flexible/critical loads on a
+site are usually already connected - each one reports its own state to
+its own app. **Physical connectivity is not system-level coordination.**
+None of those systems know about each other's intent, compete for the
+same solar surplus or the same grid-import headroom, or explain why one
+asset was favored over another.
 
-## Repository layout
+EnerFabric sits above that connectivity layer. It combines each asset's
+live telemetry, its declared **intent** (what it needs - "charge to 80%
+before 7am", "maintain 30% reserve"), and site-wide policies and
+constraints (protect critical loads, limit grid import, prefer
+renewables) into one deterministic **[Coordination Engine](docs/coordination.md)**. Given the
+current state of a fleet, it produces a feasible, per-asset allocation
+plan - and a concrete explanation for every decision in it.
+
+It is not a monitoring dashboard and not a device-connectivity layer.
+The dashboard shows state; the engine decides what happens next.
+
+## How it works
+
+![EnerFabric Architecture](docs/assets/Detailed_Architecture.png)
+
+EnerFabric combines live DER telemetry, asset intent, policies,
+priorities, and constraints to produce a feasible allocation.
+
+Full component diagram and data flow:
+[Architecture documentation](docs/architecture.md)
+
+## Live Demo
+
+**http://20.120.168.206/** - Docker Compose deployment on an Azure VM,
+served over plain HTTP through nginx (no TLS configured).
+
+## Key Components
+
+| Component | Responsibility |
+|---|---|
+| Coordination Engine | Deterministic, side-effect-free function that turns telemetry + intents + policies into a feasible, explained allocation plan. |
+| DER Simulator | Deterministic stand-in for real devices (solar, battery, EV charger, flexible/critical loads, grid), publishing over MQTT. |
+| MQTT / Mosquitto | Transport boundary DER telemetry arrives over, decoupled from the backend's internal state. |
+| Backend (FastAPI) | Owns telemetry ingestion, persistence, the REST API, and realtime broadcast; the only client of PostgreSQL and Mosquitto. |
+| PostgreSQL | Persists assets, telemetry history, intents, policies, and coordination runs. |
+| WebSocket layer | Broadcasts `telemetry.updated` and `coordination.completed` events to every connected client. |
+| Frontend (Next.js) | Five-page dashboard - Overview, Assets, Intents & Policies, Coordination, Impact - driven entirely by the REST/WebSocket API. |
+| nginx | Single public entry point in the deployed stack; routes `/` to the frontend and `/api/` to the backend. |
+
+## Repository Structure
 
 ```
-backend/    FastAPI application (coordination engine, simulator, API, DB, MQTT, WebSockets)
-frontend/   Next.js + TypeScript + Tailwind CSS product UI
-infra/      Local development infrastructure config (Mosquitto)
+enerfabric/
+├── backend/            FastAPI app: domain model, coordination engine, simulator, API, MQTT, WebSockets, DB
+├── frontend/            Next.js + TypeScript dashboard
+├── infra/
+│   ├── mosquitto/        local MQTT broker config
+│   └── nginx/            reverse proxy config for deployment
+├── docs/                 detailed guides (see below)
+├── docker-compose.yml    local infra + full-stack deployment
+└── Makefile              common dev/deploy commands
 ```
 
-## Getting started (local development)
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- Docker + Docker Compose (for Postgres/Mosquitto)
-
-### 1. Start local infrastructure
+## Quick Start
 
 ```bash
-docker compose up -d postgres mosquitto   # or: make infra-up
+docker compose up -d postgres mosquitto     # local infra
+
+cd backend && python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt && cp .env.example .env
+uvicorn app.main:app --reload               # http://localhost:8000
+
+cd frontend && npm install && cp .env.example .env.local
+npm run dev                                 # http://localhost:3000
 ```
 
-This starts PostgreSQL (`localhost:5433`) and Mosquitto (`localhost:1883`)
-for local development. PostgreSQL uses host port 5433 rather than the
-default 5432 to avoid colliding with unrelated PostgreSQL instances some
-WSL2/Docker Desktop setups already have bound to 127.0.0.1:5432; the
-container's internal port is still the standard 5432.
+Full walkthrough, including seeding assets and running the DER
+simulator: **[docs/getting-started.md](docs/getting-started.md)**.
 
-`docker-compose.yml` also defines `backend`/`frontend`/`simulator`
-services for a full containerized deployment (see
-[Deployment](#deployment-docker-compose-on-a-fresh-vm) below) — naming
-`postgres mosquitto` explicitly here keeps local dev running the
-backend/frontend as regular host processes, as in steps 2–3.
+## Documentation
 
-### 2. Backend
+- **[Getting Started](docs/getting-started.md)** — local development setup, simulator, verification.
+- **[Architecture](docs/architecture.md)** — components, data flow, source-code map.
+- **[Coordination Engine](docs/coordination.md)** — why EnerFabric exists and how it decides.
+- **[Deployment](docs/deployment.md)** — Docker Compose + Azure VM + nginx.
 
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-cp .env.example .env
-uvicorn app.main:app --reload
-```
-
-The API is served at `http://localhost:8000`; check `GET /health`.
-
-Run tests:
-
-```bash
-pytest
-```
-
-### 3. Frontend
-
-```bash
-cd frontend
-npm install
-cp .env.example .env.local   # NEXT_PUBLIC_API_URL, defaults to http://localhost:8000
-npm run dev
-```
-
-The app is served at `http://localhost:3000` and talks to the backend at
-whatever `NEXT_PUBLIC_API_URL` points to (the WebSocket URL is derived
-from it automatically — see `frontend/src/lib/config.ts`). The Overview
-page shows backend health, the registered asset list with latest
-telemetry, and a live feed of realtime events received over the
-WebSocket endpoint below.
-
-## Running the DER simulator over MQTT
-
-The backend subscribes to Mosquitto on startup and persists any telemetry
-it receives on `enerfabric/telemetry/{asset_id}` through the same
-repository/database layer the REST API uses. The DER simulator publishes
-simulated device telemetry to that broker, standing in for real device
-infrastructure. With infra up (step 1) and the backend running (step 2),
-in two more terminals from `backend/` (with the venv activated):
-
-```bash
-# One-time per fresh database: registers the simulator's fleet
-# (solar-1, battery-1, ev-1, flex-1, crit-1, grid-1) as assets, since
-# telemetry for an asset that doesn't exist yet is discarded.
-python -m app.mqtt.seed_assets
-
-# Publishes simulated telemetry for that fleet every 5 real seconds
-# (each publish advances the simulation by 15 simulated minutes).
-python -m app.mqtt.run_simulator
-```
-
-Or, from the repository root, the equivalent Makefile targets:
-
-```bash
-make infra-up
-make run-backend      # separate terminal
-make seed-assets      # once, after the backend is up
-make run-simulator    # separate terminal
-```
-
-Verify telemetry is flowing end-to-end via the existing REST API:
-
-```bash
-curl http://localhost:8000/api/v1/telemetry
-```
-
-Set `MQTT_ENABLED=false` in `backend/.env` to run the backend without a
-broker (e.g. no Docker available) — the REST API still works, just
-without live MQTT telemetry ingestion.
-
-## Realtime updates over WebSocket
-
-With the backend running (step 2), connect to:
+## Deployment
 
 ```
-ws://localhost:8000/api/v1/ws
+GitHub → Docker Compose → Azure VM → nginx (:80) → frontend + backend + Postgres + Mosquitto + simulator
 ```
 
-Every connected client receives a small JSON envelope whenever something
-happens:
+The live demo runs the full stack - PostgreSQL, Mosquitto, backend,
+frontend, the DER simulator, and nginx - as containers on a single
+Azure VM, via the same `docker-compose.yml` used for local full-stack
+testing. Only nginx (port 80) is publicly reachable; every other
+service is bound to `127.0.0.1` on the VM. See
+**[docs/deployment.md](docs/deployment.md)**.
 
-```json
-{
-  "type": "telemetry.updated",
-  "timestamp": "2026-08-14T02:13:36.270237+00:00",
-  "data": { "asset_id": "solar-1", "power_kw": 3.5, "...": "..." }
-}
-```
+## Project Status
 
-Two event types are broadcast today:
+**Implemented**
 
-- `telemetry.updated` — a telemetry reading received over MQTT was
-  persisted (see "Running the DER simulator over MQTT" above). `data` is
-  the full `Telemetry` domain object.
-- `coordination.completed` — a coordination run finished (triggered via
-  `POST /api/v1/coordination/runs`). `data` is the full `CoordinationRun`
-  domain object, including its allocations.
+- Domain model, deterministic coordination engine, DER simulator (all with dedicated test suites).
+- REST API + PostgreSQL persistence for assets, telemetry, intents, policies, and coordination runs.
+- MQTT telemetry ingestion and WebSocket realtime broadcast.
+- Full product dashboard: Overview, Assets, Intents & Policies, Coordination, Impact.
+- Docker Compose deployment behind nginx, running live on an Azure VM.
 
-The server doesn't expect or act on anything a client sends; it's a
-one-way, best-effort delivery channel with no persistence of its own — a
-client that connects after an event fired simply doesn't see it. Quick
-manual check with `websocat` (or any WebSocket client):
+**Current Limitations**
 
-```bash
-websocat ws://localhost:8000/api/v1/ws
-# in another terminal: curl -X POST http://localhost:8000/api/v1/coordination/runs \
-#   -H 'Content-Type: application/json' -d '{"trigger_reason":"manual"}'
-```
+- The Impact Engine is not implemented - every `CoordinationRun.impact` is `null`; the dashboard reports this honestly rather than fabricating metrics.
+- No coordination-run history endpoint - "recent runs" on the dashboard are session-local (this browser tab's own triggers plus live WebSocket events), not a durable log.
+- No authentication on the API, MQTT broker, or WebSocket - acceptable for a hackathon demo, not for production.
+- The live demo serves plain HTTP only - no TLS/certificate is configured.
+- Single-process WebSocket broadcast - does not scale beyond one backend instance.
 
-## Deployment (Docker Compose on a fresh VM)
+## Team
 
-Runs the complete stack — PostgreSQL, Mosquitto, backend, frontend, the
-DER simulator, and an nginx reverse proxy — as containers on a single
-host (e.g. an Ubuntu VM), using the same `docker-compose.yml` as local
-dev plus the services it adds for this purpose. No new database/
-migration mechanism is introduced: this runs the project's existing
-Alembic migrations.
-
-**Only port 80 (nginx) is public.** postgres, mosquitto, the backend
-(`8000`), and the frontend (`3000`) are all bound to `127.0.0.1` only —
-nginx routes `/` to the frontend and `/api/` (including the
-`/api/v1/ws` WebSocket, with the Upgrade/Connection headers it needs)
-to the backend over the internal Docker network. See
-`infra/nginx/nginx.conf`. HTTP only — no TLS/certificates are set up
-here.
-
-### Prerequisites
-
-- Docker Engine + Docker Compose v2 (`docker compose version`)
-- Git
-- Port `80` reachable from wherever you'll access the demo.
-
-### 1. Configure environment
-
-```bash
-git clone <repo-url>
-cd enerfabric
-cp .env.example .env
-```
-
-Edit `.env`:
-
-- `NEXT_PUBLIC_API_URL` — leave empty (the default). The frontend then
-  calls `/api/...` same-origin, which nginx forwards to the backend, so
-  no public IP/hostname needs to be set anywhere.
-- `POSTGRES_PASSWORD` — change from the placeholder for anything beyond
-  a throwaway demo.
-- `HTTP_PORT` — only change if `80` is already in use.
-
-See `.env.example` for the full list and defaults.
-
-### 2. Bring up the stack
-
-```bash
-docker compose up -d --build   # or: make deploy-up
-```
-
-This builds the backend and frontend images, starts PostgreSQL and
-Mosquitto, runs the existing Alembic migrations and asset-seeding step
-once (the `migrate` service — `alembic upgrade head` then
-`app.mqtt.seed_assets`, both already-existing, unmodified scripts), then
-starts the backend, frontend, simulator, and nginx. `docker compose ps`
-should show all seven services; `migrate` shows `Exited (0)` once it
-has finished (this is expected — it's a one-shot init step, not a
-long-running service).
-
-### 3. Verify
-
-```bash
-curl http://localhost/api/v1/assets           # backend up via nginx, seeded fleet present
-curl http://localhost/api/v1/telemetry        # simulator telemetry flowing (wait ~10s after startup)
-```
-
-Open `http://<vm-public-ip>/` in a browser — the Overview page should
-show backend/realtime status as connected, the seeded asset fleet, and
-telemetry updating live as the simulator publishes.
-
-For direct container-level debugging on the VM itself (not via nginx,
-and not reachable from outside the machine): `curl
-http://localhost:8000/health` for the backend, `curl -I
-http://localhost:3000/` for the frontend. Only nginx's `/api/*` routes
-are public — the plain `/health` route is a VM-local debug path only.
-
-### Updating
-
-```bash
-git pull
-docker compose up -d --build   # rebuilds changed images, reapplies migrations, restarts
-```
-
-### Stopping
-
-```bash
-docker compose down            # or: make deploy-down
-docker compose down -v         # also removes the postgres_data volume (destroys the database)
-```
-
-## Project status
-
-EnerFabric's core domain model, deterministic coordination engine, DER
-simulator, REST API, PostgreSQL persistence, MQTT telemetry ingestion,
-WebSocket realtime updates, and the full product dashboard (Overview,
-Assets, Intents & Policies, Coordination, Impact) are implemented and
-integrated end-to-end. See [ARCHITECTURE.md](./ARCHITECTURE.md) for a
-high-level view of how the pieces fit together.
-
-Known limitation: the backend's Impact Engine (quantifying the
-measurable outcome of a coordination decision — grid import reduction,
-renewable utilization, etc.) is not yet implemented; coordination runs
-currently report allocations and explanations without impact metrics.
+**ZenYukti** · SRCAS Hackathon 3.0 - 2026
