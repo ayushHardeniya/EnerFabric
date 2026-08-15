@@ -8,6 +8,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-22C55E)](http://20.120.168.206/)
 [![Docs](https://img.shields.io/badge/docs-guide-blue)](docs/getting-started.md)
+[![Demo Video](https://img.shields.io/badge/Demo%20Video-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/-5bFhCGbilk)
 
 Built by team **ZenYukti** for **SRCAS Hackathon 3.0**.
 
