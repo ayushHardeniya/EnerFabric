@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     app_name: str = "EnerFabric"
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
+    # Host port 5433, not the default 5432 — see docker-compose.yml's
+    # postgres service comment / CLAUDE.md Milestone 4 for why.
+    database_url: str = "postgresql+psycopg://enerfabric:enerfabric@localhost:5433/enerfabric"
 
 
 @lru_cache
