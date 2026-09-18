@@ -2,8 +2,15 @@
 
 Mounts the health check plus the Milestone 4 resource routers (assets,
 telemetry, intents, policies, coordination) under the configured API
-prefix.
+prefix. The Milestone 5 MQTT telemetry subscriber is started/stopped via
+the lifespan context below — a connection failure at startup (e.g. no
+Mosquitto reachable) is logged, not raised, so the REST API keeps serving
+even without live MQTT ingestion (see ``app.mqtt.service``).
 """
+
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -12,10 +19,33 @@ from pydantic import ValidationError
 
 from app.api.routes import router as api_router
 from app.core.config import get_settings
+from app.mqtt.service import build_telemetry_subscriber
+from app.mqtt.subscriber import TelemetrySubscriber
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    subscriber: TelemetrySubscriber | None = None
+    if settings.mqtt_enabled:
+        subscriber = build_telemetry_subscriber()
+        try:
+            subscriber.start()
+        except OSError:
+            logger.warning(
+                "MQTT broker unreachable at %s:%s — starting without live telemetry ingestion",
+                settings.mqtt_broker_host,
+                settings.mqtt_broker_port,
+            )
+            subscriber = None
+    yield
+    if subscriber is not None:
+        subscriber.stop()
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
