@@ -1,69 +1,183 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useCallback, useEffect, useState } from "react";
+import { AssetTable } from "@/components/AssetTable";
+import { EventLog } from "@/components/EventLog";
+import { StatCard } from "@/components/StatCard";
+import { StatusPill, type PillTone } from "@/components/StatusPill";
+import { api, ApiError } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
+import { useRealtimeEvents, type RealtimeConnectionStatus } from "@/lib/useRealtimeEvents";
+import type { Asset } from "@/types/domain";
+import type { RealtimeEvent } from "@/types/events";
+
+type LoadState = "loading" | "ready" | "error";
+
+const MAX_LOGGED_EVENTS = 10;
+
+export default function HomePage() {
+  const [healthState, setHealthState] = useState<LoadState>("loading");
+  const [healthError, setHealthError] = useState<string | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assetsState, setAssetsState] = useState<LoadState>("loading");
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [intentCount, setIntentCount] = useState<number | null>(null);
+  const [policyCount, setPolicyCount] = useState<number | null>(null);
+  const [events, setEvents] = useState<RealtimeEvent[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api
+      .health()
+      .then(() => !cancelled && setHealthState("ready"))
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setHealthError(err instanceof ApiError ? err.message : "Could not reach the backend.");
+        setHealthState("error");
+      });
+
+    api
+      .listAssets()
+      .then((data) => {
+        if (cancelled) return;
+        setAssets(data);
+        setAssetsState("ready");
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setAssetsError(err instanceof ApiError ? err.message : "Could not reach the backend.");
+        setAssetsState("error");
+      });
+
+    api
+      .listIntents()
+      .then((data) => !cancelled && setIntentCount(data.length))
+      .catch(() => {
+        /* intents are a secondary stat — the assets panel already surfaces backend errors */
+      });
+
+    api
+      .listPolicies()
+      .then((data) => !cancelled && setPolicyCount(data.length))
+      .catch(() => {
+        /* same as intents above */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleRealtimeEvent = useCallback((event: RealtimeEvent) => {
+    setEvents((prev) => [event, ...prev].slice(0, MAX_LOGGED_EVENTS));
+
+    if (event.type === "telemetry.updated") {
+      const telemetry = event.data;
+      setAssets((prev) =>
+        prev.map((asset) => (asset.id === telemetry.asset_id ? { ...asset, latest_telemetry: telemetry } : asset)),
+      );
+    }
+  }, []);
+
+  const wsStatus = useRealtimeEvents(handleRealtimeEvent);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">System Overview</h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Live state from the EnerFabric backend — assets, latest telemetry, and realtime
+            orchestration events.
+          </p>
+          <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+            Backend: <code className="font-mono">{API_BASE_URL}</code>
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="flex gap-2">
+          <StatusPill label={healthLabel(healthState)} tone={healthTone(healthState)} />
+          <StatusPill label={wsLabel(wsStatus)} tone={wsTone(wsStatus)} />
         </div>
-      </main>
+      </div>
+      {healthState === "error" && (
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+          {healthError ?? "Could not reach the backend."} Confirm a backend is running at{" "}
+          <code className="font-mono">{API_BASE_URL}</code> (start it, or set{" "}
+          <code className="font-mono">NEXT_PUBLIC_API_URL</code> in{" "}
+          <code className="font-mono">frontend/.env.local</code> to wherever it actually runs,
+          then restart <code className="font-mono">npm run dev</code>).
+        </p>
+      )}
+
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Assets" value={assetsState === "ready" ? String(assets.length) : "—"} />
+        <StatCard label="Intents" value={intentCount === null ? "—" : String(intentCount)} />
+        <StatCard label="Policies" value={policyCount === null ? "—" : String(policyCount)} />
+        <StatCard
+          label="Realtime events"
+          value={String(events.length)}
+          hint={events.length > 0 ? `showing last ${Math.min(events.length, MAX_LOGGED_EVENTS)}` : undefined}
+        />
+      </div>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          Assets
+        </h2>
+        <div className="mt-3">
+          {assetsState === "loading" && (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assets…</p>
+          )}
+          {assetsState === "error" && (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Could not load assets from the backend
+              {assetsError ? `: ${assetsError}` : "."}
+            </p>
+          )}
+          {assetsState === "ready" && <AssetTable assets={assets} />}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          Recent realtime events
+        </h2>
+        <div className="mt-3">
+          <EventLog events={events} />
+        </div>
+      </section>
     </div>
   );
+}
+
+function healthLabel(state: LoadState): string {
+  if (state === "loading") return "Checking backend…";
+  if (state === "ready") return "Backend online";
+  return "Backend unreachable";
+}
+
+function healthTone(state: LoadState): PillTone {
+  if (state === "ready") return "positive";
+  if (state === "error") return "negative";
+  return "neutral";
+}
+
+function wsLabel(status: RealtimeConnectionStatus): string {
+  switch (status) {
+    case "open":
+      return "Realtime connected";
+    case "connecting":
+      return "Realtime connecting…";
+    case "closed":
+      return "Realtime disconnected — retrying";
+    case "error":
+      return "Realtime error — retrying";
+  }
+}
+
+function wsTone(status: RealtimeConnectionStatus): PillTone {
+  if (status === "open") return "positive";
+  if (status === "connecting") return "neutral";
+  return "negative";
 }

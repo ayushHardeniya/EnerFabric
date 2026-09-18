@@ -69,10 +69,16 @@ pytest
 ```bash
 cd frontend
 npm install
+cp .env.example .env.local   # NEXT_PUBLIC_API_URL, defaults to http://localhost:8000
 npm run dev
 ```
 
-The app is served at `http://localhost:3000`.
+The app is served at `http://localhost:3000` and talks to the backend at
+whatever `NEXT_PUBLIC_API_URL` points to (the WebSocket URL is derived
+from it automatically — see `frontend/src/lib/config.ts`). The Overview
+page shows backend health, the registered asset list with latest
+telemetry, and a live feed of realtime events received over the
+WebSocket endpoint below.
 
 ## Running the DER simulator over MQTT
 
