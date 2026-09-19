@@ -82,10 +82,18 @@ def _asset_to_domain(row: AssetModel, latest_telemetry: Telemetry | None) -> Ass
 
 
 def _latest_telemetry_for_asset(db: Session, asset_id: str) -> Telemetry | None:
+    # Ordered by the row's own insertion-order surrogate key, not by the
+    # telemetry's self-reported `timestamp`. `timestamp` is set by whatever
+    # published the reading (e.g. the DER simulator's own simulated clock,
+    # which runs faster than real time and is not reset when the simulator
+    # restarts) — a fresh publisher can legitimately report an earlier
+    # `timestamp` than rows already persisted from a previous run. "Latest"
+    # here means "most recently received," which `id` (autoincrement)
+    # reflects correctly regardless of the publisher's clock.
     row = db.execute(
         select(TelemetryModel)
         .where(TelemetryModel.asset_id == asset_id)
-        .order_by(TelemetryModel.timestamp.desc())
+        .order_by(TelemetryModel.id.desc())
         .limit(1)
     ).scalar_one_or_none()
     return _telemetry_to_domain(row) if row is not None else None
@@ -160,7 +168,9 @@ def create_telemetry(db: Session, telemetry: Telemetry) -> Telemetry:
 
 
 def list_telemetry(db: Session, asset_id: str | None = None) -> list[Telemetry]:
-    stmt = select(TelemetryModel).order_by(TelemetryModel.timestamp)
+    # Ordered by insertion order (`id`), not `timestamp` — see
+    # `_latest_telemetry_for_asset` for why the two can diverge.
+    stmt = select(TelemetryModel).order_by(TelemetryModel.id)
     if asset_id is not None:
         stmt = stmt.where(TelemetryModel.asset_id == asset_id)
     rows = db.execute(stmt).scalars().all()

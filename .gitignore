@@ -36,4 +36,6 @@ next-env.d.ts.bak
 # --- Logs ---
 *.log
 
+# Local Claude Code state
+.claude/
 CLAUDE.md
