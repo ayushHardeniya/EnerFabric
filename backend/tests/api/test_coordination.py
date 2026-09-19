@@ -3,6 +3,8 @@ state and invoke the existing (unmodified) coordination engine, then
 persist and return the resulting CoordinationRun.
 """
 
+from datetime import UTC, datetime, timedelta
+
 
 def _create_asset(client, name, asset_type, capabilities):
     response = client.post(
@@ -58,7 +60,7 @@ def _seed_ev_charging_scenario(client):
             "asset_id": ev["id"],
             "description": "Charge to 80% before 7am",
             "target_soc_percent": 80,
-            "deadline": "2026-08-14T07:00:00+00:00",
+            "deadline": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
         },
     )
     assert intent_response.status_code == 201

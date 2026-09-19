@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { AssetTable } from "@/components/AssetTable";
 import { EventLog } from "@/components/EventLog";
+import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
+import { StatusMessage } from "@/components/StatusMessage";
 import { StatusPill, type PillTone } from "@/components/StatusPill";
 import { api, ApiError } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
+import { useAssets } from "@/lib/useAssets";
 import { useRealtimeEvents, type RealtimeConnectionStatus } from "@/lib/useRealtimeEvents";
-import type { Asset } from "@/types/domain";
 import type { RealtimeEvent } from "@/types/events";
 
 type LoadState = "loading" | "ready" | "error";
@@ -18,9 +20,7 @@ const MAX_LOGGED_EVENTS = 10;
 export default function HomePage() {
   const [healthState, setHealthState] = useState<LoadState>("loading");
   const [healthError, setHealthError] = useState<string | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [assetsState, setAssetsState] = useState<LoadState>("loading");
-  const [assetsError, setAssetsError] = useState<string | null>(null);
+  const { assets, setAssets, state: assetsState, error: assetsError } = useAssets();
   const [intentCount, setIntentCount] = useState<number | null>(null);
   const [policyCount, setPolicyCount] = useState<number | null>(null);
   const [events, setEvents] = useState<RealtimeEvent[]>([]);
@@ -35,19 +35,6 @@ export default function HomePage() {
         if (cancelled) return;
         setHealthError(err instanceof ApiError ? err.message : "Could not reach the backend.");
         setHealthState("error");
-      });
-
-    api
-      .listAssets()
-      .then((data) => {
-        if (cancelled) return;
-        setAssets(data);
-        setAssetsState("ready");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setAssetsError(err instanceof ApiError ? err.message : "Could not reach the backend.");
-        setAssetsState("error");
       });
 
     api
@@ -69,37 +56,43 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleRealtimeEvent = useCallback((event: RealtimeEvent) => {
-    setEvents((prev) => [event, ...prev].slice(0, MAX_LOGGED_EVENTS));
+  const handleRealtimeEvent = useCallback(
+    (event: RealtimeEvent) => {
+      setEvents((prev) => [event, ...prev].slice(0, MAX_LOGGED_EVENTS));
 
-    if (event.type === "telemetry.updated") {
-      const telemetry = event.data;
-      setAssets((prev) =>
-        prev.map((asset) => (asset.id === telemetry.asset_id ? { ...asset, latest_telemetry: telemetry } : asset)),
-      );
-    }
-  }, []);
+      if (event.type === "telemetry.updated") {
+        const telemetry = event.data;
+        setAssets((prev) =>
+          prev.map((asset) => (asset.id === telemetry.asset_id ? { ...asset, latest_telemetry: telemetry } : asset)),
+        );
+      }
+    },
+    [setAssets],
+  );
 
   const wsStatus = useRealtimeEvents(handleRealtimeEvent);
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">System Overview</h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+      <PageHeader
+        title="System Overview"
+        description={
+          <>
             Live state from the EnerFabric backend — assets, latest telemetry, and realtime
             orchestration events.
-          </p>
-          <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-            Backend: <code className="font-mono">{API_BASE_URL}</code>
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <StatusPill label={healthLabel(healthState)} tone={healthTone(healthState)} />
-          <StatusPill label={wsLabel(wsStatus)} tone={wsTone(wsStatus)} />
-        </div>
-      </div>
+            <br />
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              Backend: <code className="font-mono">{API_BASE_URL}</code>
+            </span>
+          </>
+        }
+        actions={
+          <>
+            <StatusPill label={healthLabel(healthState)} tone={healthTone(healthState)} />
+            <StatusPill label={wsLabel(wsStatus)} tone={wsTone(wsStatus)} />
+          </>
+        }
+      />
       {healthState === "error" && (
         <p className="mt-2 text-sm text-red-600 dark:text-red-400">
           {healthError ?? "Could not reach the backend."} Confirm a backend is running at{" "}
@@ -111,9 +104,21 @@ export default function HomePage() {
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Assets" value={assetsState === "ready" ? String(assets.length) : "—"} />
-        <StatCard label="Intents" value={intentCount === null ? "—" : String(intentCount)} />
-        <StatCard label="Policies" value={policyCount === null ? "—" : String(policyCount)} />
+        <StatCard
+          label="Assets"
+          value={assetsState === "ready" ? String(assets.length) : "—"}
+          href="/assets"
+        />
+        <StatCard
+          label="Intents"
+          value={intentCount === null ? "—" : String(intentCount)}
+          href="/intents-policies"
+        />
+        <StatCard
+          label="Policies"
+          value={policyCount === null ? "—" : String(policyCount)}
+          href="/intents-policies"
+        />
         <StatCard
           label="Realtime events"
           value={String(events.length)}
@@ -126,14 +131,11 @@ export default function HomePage() {
           Assets
         </h2>
         <div className="mt-3">
-          {assetsState === "loading" && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assets…</p>
-          )}
+          {assetsState === "loading" && <StatusMessage>Loading assets…</StatusMessage>}
           {assetsState === "error" && (
-            <p className="text-sm text-red-600 dark:text-red-400">
-              Could not load assets from the backend
-              {assetsError ? `: ${assetsError}` : "."}
-            </p>
+            <StatusMessage tone="error">
+              Could not load assets from the backend{assetsError ? `: ${assetsError}` : "."}
+            </StatusMessage>
           )}
           {assetsState === "ready" && <AssetTable assets={assets} />}
         </div>

@@ -74,20 +74,52 @@ export interface Asset {
   latest_telemetry: Telemetry | null;
 }
 
-/**
- * The fields every Intent subtype shares (IntentBase in the backend).
- * Subtype-specific fields (e.g. target_soc_percent, deadline) aren't
- * modeled since M7 only needs intent counts/summaries, not the
- * per-type detail view — that's M8 dashboard territory.
- */
-export interface IntentSummary {
+/** Fields every Intent subtype shares (IntentBase in the backend). */
+export interface IntentBase {
   id: string;
   asset_id: string;
-  type: IntentType;
   priority: Priority;
   description: string;
   created_at: string;
 }
+
+export interface TargetSocByDeadlineIntent extends IntentBase {
+  type: "target_soc_by_deadline";
+  target_soc_percent: number;
+  deadline: string;
+}
+
+export interface MinimumReserveIntent extends IntentBase {
+  type: "minimum_reserve";
+  min_soc_percent: number;
+}
+
+export interface MinimumSupplyIntent extends IntentBase {
+  type: "minimum_supply";
+  min_power_kw: number;
+}
+
+export interface DeferrableIntent extends IntentBase {
+  type: "deferrable";
+  window_start: string | null;
+  window_end: string | null;
+}
+
+export interface PreferRenewableIntent extends IntentBase {
+  type: "prefer_renewable";
+}
+
+/**
+ * Mirrors backend/app/domain/intent.py's discriminated union — Intent
+ * is a union of five subtypes, discriminated on `type`, each carrying
+ * only the fields its shape needs.
+ */
+export type Intent =
+  | TargetSocByDeadlineIntent
+  | MinimumReserveIntent
+  | MinimumSupplyIntent
+  | DeferrableIntent
+  | PreferRenewableIntent;
 
 export interface Policy {
   id: string;
