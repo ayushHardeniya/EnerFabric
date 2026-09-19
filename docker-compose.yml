@@ -19,8 +19,7 @@ services:
     # unrelated PostgreSQL instance outside Docker (reached via WSL2's
     # automatic loopback forwarding), which silently intercepts connections
     # with different credentials. The container's own internal port stays
-    # 5432 — only the host mapping changed. See CLAUDE.md Milestone 4 for
-    # the diagnosis.
+    # 5432 — only the host mapping changed.
     ports:
       - "5433:5432"
     volumes:

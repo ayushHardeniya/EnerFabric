@@ -5,9 +5,9 @@ attach to (telemetry for an unregistered asset is discarded — see
 ``service.persist_telemetry``).
 
 Not part of the MQTT runtime flow itself — asset registration is its own
-concern, separate from telemetry ingestion (see CLAUDE.md's architecture
-diagram: "Asset Registry" is distinct from "Telemetry"). This exists only
-so Milestone 5's local setup can go from a clean database to a
+concern, separate from telemetry ingestion ("Asset Registry" is distinct
+from "Telemetry" in the system architecture). This exists only
+so a local setup can go from a clean database to a
 demonstrable end-to-end result without manually posting six assets by
 hand. Writes directly through the repository layer (not the REST API)
 because asset creation via ``POST /api/v1/assets`` always server-generates

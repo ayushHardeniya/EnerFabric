@@ -57,9 +57,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 # Milestone 7: the Next.js dev server runs on a different origin
 # (localhost:3000 vs this API's localhost:8000), so the browser needs
-# CORS headers to fetch it directly. No auth/cookies exist yet (see
-# CLAUDE.md non-goals), so a permissive wildcard origin is sufficient
-# and keeps this a one-line addition rather than a new settings field.
+# CORS headers to fetch it directly. No auth/cookies exist yet at this
+# stage, so a permissive wildcard origin is sufficient and keeps this a
+# one-line addition rather than a new settings field.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

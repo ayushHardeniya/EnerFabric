@@ -12,10 +12,8 @@ state, to produce a feasible, explainable, multi-asset allocation plan.
 It is not a monitoring dashboard: it makes and explains operational
 decisions.
 
-See **[CLAUDE.md](./CLAUDE.md)** for the full product context,
-architecture, domain model, technology decisions, non-goals, and
-current implementation status — it is the living source of truth for
-this project throughout the hackathon.
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for a high-level overview
+of the system's components and how data flows through them.
 
 ## Repository layout
 
@@ -160,6 +158,14 @@ websocat ws://localhost:8000/api/v1/ws
 
 ## Project status
 
-Milestone 0 (repository bootstrap) is complete and has passed a strict
-pre-commit audit. See [CLAUDE.md](./CLAUDE.md) §19 for current
-implementation status, completed milestones, and known issues.
+EnerFabric's core domain model, deterministic coordination engine, DER
+simulator, REST API, PostgreSQL persistence, MQTT telemetry ingestion,
+WebSocket realtime updates, and the full product dashboard (Overview,
+Assets, Intents & Policies, Coordination, Impact) are implemented and
+integrated end-to-end. See [ARCHITECTURE.md](./ARCHITECTURE.md) for a
+high-level view of how the pieces fit together.
+
+Known limitation: the backend's Impact Engine (quantifying the
+measurable outcome of a coordination decision — grid import reduction,
+renewable utilization, etc.) is not yet implemented; coordination runs
+currently report allocations and explanations without impact metrics.

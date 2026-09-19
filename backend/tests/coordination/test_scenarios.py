@@ -1,6 +1,6 @@
-"""End-to-end tests for the three MVP scenarios documented in
-CLAUDE.md §6: Solar Surplus / EV charging, Battery reserve / peak
-constraint, and Grid Outage / critical load protection. These exercise
+"""End-to-end tests for the three MVP scenarios: Solar Surplus / EV
+charging, Battery reserve / peak constraint, and Grid Outage / critical
+load protection. These exercise
 the engine the way the demo will: a realistic multi-asset snapshot in,
 a full CoordinationRun out.
 """

@@ -30,8 +30,8 @@ export default function ImpactPage() {
       />
 
       <StatusMessage>
-        The backend&apos;s Impact Engine hasn&apos;t been implemented yet (see CLAUDE.md §Milestone
-        2 known limitations) — every coordination run currently reports no impact metrics. This
+        The backend&apos;s Impact Engine hasn&apos;t been implemented yet — every coordination run
+        currently reports no impact metrics. This
         page will populate automatically once that engine exists; in the meantime it shows the
         real allocation outcomes of each run triggered or observed this session.
       </StatusMessage>
