@@ -164,19 +164,26 @@ websocat ws://localhost:8000/api/v1/ws
 
 ## Deployment (Docker Compose on a fresh VM)
 
-Runs the complete stack — PostgreSQL, Mosquitto, backend, frontend, and
-the DER simulator — as containers on a single host (e.g. an Ubuntu VM),
-using the same `docker-compose.yml` as local dev plus the services it
-adds for this purpose. No new database/migration mechanism is
-introduced: this runs the project's existing Alembic migrations.
+Runs the complete stack — PostgreSQL, Mosquitto, backend, frontend, the
+DER simulator, and an nginx reverse proxy — as containers on a single
+host (e.g. an Ubuntu VM), using the same `docker-compose.yml` as local
+dev plus the services it adds for this purpose. No new database/
+migration mechanism is introduced: this runs the project's existing
+Alembic migrations.
+
+**Only port 80 (nginx) is public.** postgres, mosquitto, the backend
+(`8000`), and the frontend (`3000`) are all bound to `127.0.0.1` only —
+nginx routes `/` to the frontend and `/api/` (including the
+`/api/v1/ws` WebSocket, with the Upgrade/Connection headers it needs)
+to the backend over the internal Docker network. See
+`infra/nginx/nginx.conf`. HTTP only — no TLS/certificates are set up
+here.
 
 ### Prerequisites
 
 - Docker Engine + Docker Compose v2 (`docker compose version`)
 - Git
-- Ports `8000` (backend) and `3000` (frontend) reachable from wherever
-  you'll access the demo; PostgreSQL/Mosquitto are bound to
-  `127.0.0.1` only and are never exposed externally.
+- Port `80` reachable from wherever you'll access the demo.
 
 ### 1. Configure environment
 
@@ -188,15 +195,12 @@ cp .env.example .env
 
 Edit `.env`:
 
-- `NEXT_PUBLIC_API_URL` — set to `http://<vm-public-ip>:8000` (or a
-  domain, if you have one). This is the URL a **browser** will use to
-  reach the backend, and is baked into the frontend at build time — get
-  it right before building, since changing it later requires rebuilding
-  the frontend image.
+- `NEXT_PUBLIC_API_URL` — leave empty (the default). The frontend then
+  calls `/api/...` same-origin, which nginx forwards to the backend, so
+  no public IP/hostname needs to be set anywhere.
 - `POSTGRES_PASSWORD` — change from the placeholder for anything beyond
   a throwaway demo.
-- `BACKEND_PORT` / `FRONTEND_PORT` — only change if `8000`/`3000` are
-  already in use.
+- `HTTP_PORT` — only change if `80` is already in use.
 
 See `.env.example` for the full list and defaults.
 
@@ -210,22 +214,27 @@ This builds the backend and frontend images, starts PostgreSQL and
 Mosquitto, runs the existing Alembic migrations and asset-seeding step
 once (the `migrate` service — `alembic upgrade head` then
 `app.mqtt.seed_assets`, both already-existing, unmodified scripts), then
-starts the backend, frontend, and simulator. `docker compose ps` should
-show all six services; `migrate` shows `Exited (0)` once it has finished
-(this is expected — it's a one-shot init step, not a long-running
-service).
+starts the backend, frontend, simulator, and nginx. `docker compose ps`
+should show all seven services; `migrate` shows `Exited (0)` once it
+has finished (this is expected — it's a one-shot init step, not a
+long-running service).
 
 ### 3. Verify
 
 ```bash
-curl http://localhost:8000/health                 # backend up
-curl http://localhost:8000/api/v1/assets           # seeded fleet present
-curl http://localhost:8000/api/v1/telemetry        # simulator telemetry flowing (wait ~10s after startup)
+curl http://localhost/api/v1/assets           # backend up via nginx, seeded fleet present
+curl http://localhost/api/v1/telemetry        # simulator telemetry flowing (wait ~10s after startup)
 ```
 
-Open `http://<vm-public-ip>:3000` in a browser — the Overview page
-should show backend/realtime status as connected, the seeded asset
-fleet, and telemetry updating live as the simulator publishes.
+Open `http://<vm-public-ip>/` in a browser — the Overview page should
+show backend/realtime status as connected, the seeded asset fleet, and
+telemetry updating live as the simulator publishes.
+
+For direct container-level debugging on the VM itself (not via nginx,
+and not reachable from outside the machine): `curl
+http://localhost:8000/health` for the backend, `curl -I
+http://localhost:3000/` for the frontend. Only nginx's `/api/*` routes
+are public — the plain `/health` route is a VM-local debug path only.
 
 ### Updating
 
