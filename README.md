@@ -4,12 +4,10 @@
 
 [![MQTT](https://img.shields.io/badge/telemetry-MQTT-660066?logo=eclipsemosquitto&logoColor=white)](infra/mosquitto/mosquitto.conf)
 [![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
-[![Azure](https://img.shields.io/badge/hosted%20on-Azure-0078D4?logo=microsoftazure&logoColor=white)](docs/deployment.md)
+[![AWS](https://img.shields.io/badge/hosted%20on-AWS-FF9900?logo=amazonaws&logoColor=white)](docs/deployment.md)
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-22C55E)](http://20.120.168.206/)
+[![Deployment](https://img.shields.io/badge/deployment-details-22C55E)](docs/deployment.md)
 [![Docs](https://img.shields.io/badge/docs-guide-blue)](docs/getting-started.md)
-
-Built by team **ZenYukti** for **SRCAS Hackathon 3.0**.
 
 ## What is EnerFabric?
 
@@ -43,8 +41,9 @@ Full component diagram and data flow:
 
 ## Live Demo
 
-**http://20.120.168.206/** - Docker Compose deployment on an Azure VM,
-served over plain HTTP through nginx (no TLS configured).
+**<DEPLOYMENT_URL>** - Docker Compose deployment on AWS EC2, served
+through nginx. The deployment endpoint and TLS status will be documented
+once the AWS deployment is finalized.
 
 ## Key Components
 
@@ -94,19 +93,23 @@ simulator: **[docs/getting-started.md](docs/getting-started.md)**.
 - **[Getting Started](docs/getting-started.md)** — local development setup, simulator, verification.
 - **[Architecture](docs/architecture.md)** — components, data flow, source-code map.
 - **[Coordination Engine](docs/coordination.md)** — why EnerFabric exists and how it decides.
-- **[Deployment](docs/deployment.md)** — Docker Compose + Azure VM + nginx.
+- **[Deployment](docs/deployment.md)** — Docker Compose + AWS EC2 + nginx.
 
 ## Deployment
 
 ```
-GitHub → Docker Compose → Azure VM → nginx (:80) → frontend + backend + Postgres + Mosquitto + simulator
+GitHub → Docker Compose → AWS EC2 → nginx (:80) → frontend + backend
+													 ├── PostgreSQL
+													 ├── Mosquitto
+													 └── DER simulator
 ```
 
 The live demo runs the full stack - PostgreSQL, Mosquitto, backend,
-frontend, the DER simulator, and nginx - as containers on a single
-Azure VM, via the same `docker-compose.yml` used for local full-stack
-testing. Only nginx (port 80) is publicly reachable; every other
-service is bound to `127.0.0.1` on the VM. See
+frontend, the DER simulator, and nginx - as containers on a single AWS
+EC2 host, via the same `docker-compose.yml` used for local full-stack
+testing. EC2 is the host; it does not change the application architecture.
+Only nginx (port 80) is publicly reachable; every other service is bound
+to `127.0.0.1` on the EC2 host. See
 **[docs/deployment.md](docs/deployment.md)**.
 
 ## Project Status
@@ -117,16 +120,13 @@ service is bound to `127.0.0.1` on the VM. See
 - REST API + PostgreSQL persistence for assets, telemetry, intents, policies, and coordination runs.
 - MQTT telemetry ingestion and WebSocket realtime broadcast.
 - Full product dashboard: Overview, Assets, Intents & Policies, Coordination, Impact.
-- Docker Compose deployment behind nginx, running live on an Azure VM.
+- Docker Compose deployment behind nginx, targeting an AWS EC2 host.
 
 **Current Limitations**
 
 - The Impact Engine is not implemented - every `CoordinationRun.impact` is `null`; the dashboard reports this honestly rather than fabricating metrics.
 - No coordination-run history endpoint - "recent runs" on the dashboard are session-local (this browser tab's own triggers plus live WebSocket events), not a durable log.
-- No authentication on the API, MQTT broker, or WebSocket - acceptable for a hackathon demo, not for production.
+- No authentication on the API, MQTT broker, or WebSocket - acceptable for this MVP, not for production.
 - The live demo serves plain HTTP only - no TLS/certificate is configured.
 - Single-process WebSocket broadcast - does not scale beyond one backend instance.
 
-## Team
-
-**ZenYukti** · SRCAS Hackathon 3.0 - 2026

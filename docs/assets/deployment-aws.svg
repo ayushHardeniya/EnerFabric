@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="864" viewBox="0 0 1536 864" role="img" aria-labelledby="title desc">
+  <title id="title">EnerFabric AWS EC2 deployment flow</title>
+  <desc id="desc">GitHub flows through Docker Compose to AWS EC2, where nginx exposes the frontend and backend while PostgreSQL, Mosquitto, and the DER simulator remain internal services.</desc>
+  <rect width="1536" height="864" fill="#020f1c"/>
+  <g fill="none" stroke="#6d9eea" stroke-width="4">
+    <rect x="32" y="250" width="220" height="360" rx="28"/>
+    <rect x="292" y="250" width="260" height="360" rx="28"/>
+    <rect x="592" y="250" width="260" height="360" rx="28"/>
+    <rect x="892" y="250" width="220" height="360" rx="28"/>
+    <rect x="1152" y="180" width="352" height="500" rx="28"/>
+    <path d="M252 430h40M552 430h40M852 430h40M1112 430h40"/>
+    <path d="M280 418l12 12-12 12M580 418l12 12-12 12M880 418l12 12-12 12M1140 418l12 12-12 12"/>
+    <path d="M1240 300h-48v360h48M1192 360h48M1192 430h48M1192 500h48M1192 570h48"/>
+  </g>
+  <g fill="#f7f9fc" font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="142" y="530" font-size="30">GitHub</text>
+    <text x="422" y="530" font-size="30">Docker Compose</text>
+    <text x="722" y="530" font-size="30">AWS EC2</text>
+    <text x="1002" y="530" font-size="30">nginx :80</text>
+  </g>
+  <g fill="#f7f9fc" font-family="Arial, sans-serif" font-size="25">
+    <text x="1280" y="330">Frontend</text>
+    <text x="1280" y="400">Backend</text>
+    <text x="1280" y="470">PostgreSQL</text>
+    <text x="1280" y="540">Mosquitto</text>
+    <text x="1280" y="610">DER simulator</text>
+  </g>
+  <g fill="none" stroke="#6d9eea" stroke-width="4">
+    <circle cx="142" cy="360" r="28"/>
+    <path d="M142 388v70M142 412l42-24M142 412l-42-24M100 388v-28M184 388v-28"/>
+    <path d="M382 350l40-25 40 25-40 25zM382 390l40 25 40-25M382 430l40 25 40-25"/>
+    <rect x="680" y="320" width="84" height="128" rx="12"/>
+    <path d="M702 345h40M702 370h40M718 424h8"/>
+    <path d="M1002 330l42 24v48l-42 24-42-24v-48zM982 365l20 20 32-38"/>
+  </g>
+</svg>

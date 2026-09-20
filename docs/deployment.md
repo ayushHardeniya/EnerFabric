@@ -1,9 +1,9 @@
 # Deployment
 
-The live demo (**http://20.120.168.206/**) runs the full stack -
-PostgreSQL, Mosquitto, backend, frontend, the DER simulator, and an
-nginx reverse proxy — as containers on a single Azure VM, using the
-same [`docker-compose.yml`](../docker-compose.yml) as local full-stack
+The AWS EC2 deployment runs the full stack - PostgreSQL, Mosquitto,
+backend, frontend, the DER simulator, and an nginx reverse proxy - as
+containers on a single EC2 host, using the same
+[`docker-compose.yml`](../docker-compose.yml) as local full-stack
 testing. No separate database/migration mechanism is introduced - this
 runs the project's existing Alembic migrations.
 
@@ -12,21 +12,49 @@ GitHub
   ↓
 Docker Compose  (postgres, mosquitto, migrate, backend, frontend, simulator, nginx)
   ↓
-Azure VM
+AWS EC2
   ↓
 nginx :80
   ├── /      → frontend
   └── /api/  → backend  (including /api/v1/ws)
+                 ├── PostgreSQL
+                 ├── Mosquitto
+                 └── DER simulator
 ```
 
 **Only port 80 (nginx) is public.** PostgreSQL, Mosquitto, the backend
 (`8000`), and the frontend (`3000`) are all bound to `127.0.0.1` on the
-VM — reachable for local debugging on the machine itself, never from
+EC2 host — reachable for local debugging on the machine itself, never from
 outside it. nginx is the single public entry point; see
 [`infra/nginx/nginx.conf`](../infra/nginx/nginx.conf). HTTP only — no
 TLS/certificate is configured.
 
-![Deployment Flow](../docs/assets/deployment.png)
+Layout of AWS-EC2 instance:
+
+```text
+                    AWS EC2
+                       │
+                 Docker Compose
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+      nginx         Frontend       Backend
+      :80            :3000          :8000
+                       │              │
+                       │        ┌─────┴─────┐
+                       │        │           │
+                       │    PostgreSQL  Mosquitto
+                       │                    │
+                       │                 Simulator
+                       │                    │
+                       └──── live telemetry ┘
+```
+
+The public deployment URL, AWS region, and EC2 public address are not
+set yet. Use `<DEPLOYMENT_URL>`, `<AWS_REGION>`, and
+`<EC2_PUBLIC_IP>` as placeholders until the AWS deployment is finalized.
+
+![Deployment Flow](assets/deployment-aws.svg)
 
 ## Prerequisites
 
@@ -78,11 +106,11 @@ curl http://localhost/api/v1/assets       # backend reachable via nginx, seeded 
 curl http://localhost/api/v1/telemetry    # simulator telemetry flowing (wait ~10s after startup)
 ```
 
-Open `http://<vm-public-ip>/` in a browser — the Overview page should
+Open `<DEPLOYMENT_URL>` in a browser — the Overview page should
 show backend/realtime status as connected, the seeded asset fleet, and
 telemetry updating live as the simulator publishes.
 
-For direct container-level debugging on the VM itself (not via nginx,
+For direct container-level debugging on the EC2 host itself (not via nginx,
 not reachable from outside the machine):
 
 ```bash
